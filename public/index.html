@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Portfolio</title>
+    <link rel="stylesheet" href="/css/styles.css" />
+    <link
+      rel="stylesheet"
+      href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css"
+    />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Inter:wght@400;500;600;700&display=swap"
+      rel="stylesheet"
+    />
+  </head>
+  <body>
+    <!-- Screenshot Protection Overlay -->
+    <div id="screenshotGuard" class="screenshot-guard hidden">
+      <div class="guard-content">
+        <i class="fas fa-shield-alt"></i>
+        <h2>Content Protected</h2>
+        <p>Screenshots are not allowed on this platform</p>
+      </div>
+    </div>
+
+    <!-- Watermark Overlay -->
+    <div class="watermark-overlay" id="watermarkOverlay"></div>
+
+    <!-- Auth Modal -->
+    <div id="authModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content auth-modal-content">
+        <!-- Login Tab -->
+        <div class="auth-tab active">
+          <div class="auth-header">
+            <h2>Welcome</h2>
+            <p>Sign in to access premium content</p>
+          </div>
+          <form onsubmit="handleLogin(event)">
+            <div class="form-group">
+              <label for="loginUsername">
+                <i class="fas fa-user"></i> Username
+              </label>
+              <input
+                type="text"
+                id="loginUsername"
+                placeholder="Enter your username"
+                required
+              />
+            </div>
+            <div class="form-group">
+              <label for="loginPassword">
+                <i class="fas fa-lock"></i> Password
+              </label>
+              <div class="password-wrapper">
+                <input
+                  type="password"
+                  id="loginPassword"
+                  placeholder="Enter your password"
+                  required
+                />
+                <button
+                  type="button"
+                  class="toggle-password"
+                  onclick="togglePassword('loginPassword', this)"
+                >
+                  <i class="fas fa-eye"></i>
+                </button>
+              </div>
+            </div>
+
+            <button type="submit" class="btn-primary btn-full btn-glow">
+              <i class="fas fa-sign-in-alt"></i> Sign In
+            </button>
+            <p class="form-toggle">Use provided credentials to login</p>
+          </form>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation -->
+    <nav class="navbar" id="navbar">
+      <div class="navbar-container">
+        <a class="navbar-logo" href="#">
+          <strong>Portfolio</strong>
+        </a>
+
+        <button class="hamburger" id="hamburger" onclick="toggleMobileMenu()">
+          <span></span>
+          <span></span>
+          <span></span>
+        </button>
+
+        <ul class="nav-menu" id="navMenu">
+          <li class="nav-item">
+            <a
+              href="#logos"
+              onclick="handleProtectedNav('logos')"
+              class="nav-link"
+              data-page="logos"
+            >
+              <i class="fas fa-paint-brush"></i> Logos
+            </a>
+          </li>
+          <li class="nav-item">
+            <a
+              href="#banners"
+              onclick="handleProtectedNav('banners')"
+              class="nav-link"
+              data-page="banners"
+            >
+              <i class="fas fa-image"></i> Banners
+            </a>
+          </li>
+          <li class="nav-item">
+            <a
+              href="#designs"
+              onclick="handleProtectedNav('designs')"
+              class="nav-link"
+              data-page="designs"
+            >
+              <i class="fas fa-palette"></i> Designs
+            </a>
+          </li>
+
+          <li class="nav-item">
+            <a
+              href="#prints"
+              onclick="handleProtectedNav('prints')"
+              class="nav-link"
+              data-page="prints"
+            >
+              <i class="fas fa-print"></i> Prints
+            </a>
+          </li>
+
+          <li class="nav-item" id="adminNavItem" style="display: none">
+            <a
+              href="#admin"
+              onclick="navigateTo('admin')"
+              class="nav-link"
+              data-page="admin"
+            >
+              <i class="fas fa-tachometer-alt"></i> Admin
+            </a>
+          </li>
+
+          <li class="nav-item nav-auth">
+            <button
+              id="authButton"
+              class="btn-nav-login"
+              onclick="openAuthModal()"
+            >
+              <i class="fas fa-sign-in-alt"></i> Login
+            </button>
+            <div id="userMenu" class="user-dropdown" style="display: none">
+              <button class="user-avatar-btn" onclick="toggleUserDropdown()">
+                <div class="user-avatar" id="userAvatar">A</div>
+                <span id="userGreeting">User</span>
+                <i class="fas fa-chevron-down"></i>
+              </button>
+              <div class="dropdown-menu" id="dropdownMenu">
+                <div class="dropdown-header">
+                  <div class="user-avatar-lg" id="userAvatarLg">A</div>
+                  <div>
+                    <strong id="dropdownName">User</strong>
+                    <small id="dropdownRole">Member</small>
+                  </div>
+                </div>
+                <div class="dropdown-divider"></div>
+                <a onclick="navigateTo('profile')" class="dropdown-item">
+                  <i class="fas fa-user"></i> My Profile
+                </a>
+                <a onclick="navigateTo('settings')" class="dropdown-item">
+                  <i class="fas fa-cog"></i> Settings
+                </a>
+                <div class="dropdown-divider"></div>
+                <a onclick="handleLogout()" class="dropdown-item text-danger">
+                  <i class="fas fa-sign-out-alt"></i> Logout
+                </a>
+              </div>
+            </div>
+          </li>
+        </ul>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content" id="mainContent">
+      <!-- ==================== LOGOS PAGE (Protected) ==================== -->
+      <section id="logosPage" class="page protected-page active">
+        <div class="page-hero">
+          <div class="page-hero-content">
+            <span class="section-badge">Portfolio</span>
+            <h1>Logo <span class="gradient-text">Collection</span></h1>
+            <p>Premium logos crafted for modern brands</p>
+          </div>
+        </div>
+        <div class="content-container">
+          <!-- Admin Upload Button -->
+          <div
+            class="admin-toolbar"
+            id="logosAdminToolbar"
+            style="display: none"
+          >
+            <button class="btn-primary" onclick="openUploadModal('logos')">
+              <i class="fas fa-cloud-upload-alt"></i> Upload New Logo
+            </button>
+          </div>
+
+          <div class="gallery-filter">
+            <button
+              class="filter-btn active"
+              onclick="filterGallery('all', this)"
+            >
+              All
+            </button>
+            <button class="filter-btn" onclick="filterGallery('recent', this)">
+              Recent
+            </button>
+          </div>
+
+          <div class="gallery masonry" id="logosGallery"></div>
+          <div id="logosEmpty" class="empty-state" style="display: none">
+            <i class="fas fa-image"></i>
+            <h3>No Logos Yet</h3>
+            <p>Check back soon for amazing logo designs!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== BANNERS PAGE (Protected) ==================== -->
+      <section id="bannersPage" class="page protected-page">
+        <div class="page-hero">
+          <div class="page-hero-content">
+            <span class="section-badge">Portfolio</span>
+            <h1>Banner <span class="gradient-text">Gallery</span></h1>
+            <p>Professional banners for your campaigns</p>
+          </div>
+        </div>
+
+        <div class="content-container">
+          <!-- Admin Upload Button -->
+          <div
+            class="admin-toolbar"
+            id="bannersAdminToolbar"
+            style="display: none"
+          >
+            <input type="hidden" id="uploadTypeInput" />
+            <button class="btn-primary" onclick="openUploadModal('banners')">
+              <i class="fas fa-cloud-upload-alt"></i> Upload New Banner
+            </button>
+          </div>
+
+          <div class="gallery-filter">
+            <button
+              class="filter-btn active"
+              onclick="filterGallery('all', this)"
+            >
+              All
+            </button>
+            <button class="filter-btn" onclick="filterGallery('recent', this)">
+              Recent
+            </button>
+          </div>
+
+          <div class="gallery masonry" id="bannersGallery"></div>
+
+          <div id="bannersEmpty" class="empty-state" style="display: none">
+            <i class="fas fa-images"></i>
+            <h3>No Banners Yet</h3>
+            <p>Check back soon for amazing banner designs!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== DESIGNS PAGE (Protected) ==================== -->
+      <section id="designsPage" class="page protected-page">
+        <div class="page-hero">
+          <div class="page-hero-content">
+            <span class="section-badge">Portfolio</span>
+            <h1>Design <span class="gradient-text">Uploads</span></h1>
+            <p>Professional designs and print materials</p>
+          </div>
+        </div>
+
+        <div class="content-container">
+          <!-- Admin Upload Button -->
+          <div
+            class="admin-toolbar"
+            id="designsAdminToolbar"
+            style="display: none"
+          >
+            <input type="hidden" id="uploadTypeInput" />
+            <button class="btn-primary" onclick="openUploadModal('designs')">
+              <i class="fas fa-cloud-upload-alt"></i> Upload New Design
+            </button>
+          </div>
+
+          <div class="gallery-filter">
+            <button
+              class="filter-btn active"
+              onclick="filterGallery('all', this)"
+            >
+              All
+            </button>
+            <button class="filter-btn" onclick="filterGallery('recent', this)">
+              Recent
+            </button>
+          </div>
+
+          <div class="gallery masonry" id="designsGallery"></div>
+
+          <div id="designsEmpty" class="empty-state" style="display: none">
+            <i class="fas fa-file-upload"></i>
+            <h3>No Designs Yet</h3>
+            <p>Check back soon for amazing design uploads!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== Print PAGE (Protected) ==================== -->
+      <section id="printsPage" class="page protected-page">
+        <div class="page-hero">
+          <div class="page-hero-content">
+            <span class="section-badge">Portfolio</span>
+            <h1>Print <span class="gradient-text">Uploads</span></h1>
+            <p>Professional prints materials</p>
+          </div>
+        </div>
+
+        <div class="content-container">
+          <!-- Admin Upload Button -->
+          <div
+            class="admin-toolbar"
+            id="printsAdminToolbar"
+            style="display: none"
+          >
+            <input type="hidden" id="uploadTypeInput" />
+            <button class="btn-primary" onclick="openUploadModal('prints')">
+              <i class="fas fa-cloud-upload-alt"></i> Upload New Print
+            </button>
+          </div>
+
+          <div class="gallery-filter">
+            <button
+              class="filter-btn active"
+              onclick="filterGallery('all', this)"
+            >
+              All
+            </button>
+            <button class="filter-btn" onclick="filterGallery('recent', this)">
+              Recent
+            </button>
+          </div>
+
+          <div class="gallery masonry" id="printsGallery"></div>
+
+          <div id="printsEmpty" class="empty-state" style="display: none">
+            <i class="fas fa-file-upload"></i>
+            <h3>No Prints Yet</h3>
+            <p>Check back soon for amazing print uploads!</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== PROFILE PAGE ==================== -->
+      <section id="profilePage" class="page">
+        <div class="page-hero">
+          <div class="page-hero-content">
+            <span class="section-badge">Account</span>
+            <h1>My <span class="gradient-text">Profile</span></h1>
+            <p>Manage your account details</p>
+          </div>
+        </div>
+        <div class="content-container">
+          <div class="profile-card">
+            <div class="profile-header">
+              <div class="profile-avatar" id="profileAvatar">
+                <i class="fas fa-user"></i>
+              </div>
+              <div class="profile-info">
+                <h2 id="profileName">Guest</h2>
+                <span class="profile-role" id="profileRole">User</span>
+                <p id="profileEmail">Not logged in</p>
+              </div>
+            </div>
+            <div class="profile-details">
+              <div class="detail-row">
+                <span class="detail-label">Member Since</span>
+                <span class="detail-value" id="profileDate">-</span>
+              </div>
+              <div class="detail-row">
+                <span class="detail-label">Account Type</span>
+                <span class="detail-value" id="profileType">Free</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== SETTINGS PAGE ==================== -->
+      <section id="settingsPage" class="page">
+        <div class="page-hero">
+          <div class="page-hero-content">
+            <span class="section-badge">Preferences</span>
+            <h1>Account <span class="gradient-text">Settings</span></h1>
+            <p>Customize your experience</p>
+          </div>
+        </div>
+        <div class="content-container">
+          <div class="settings-card">
+            <div class="setting-row">
+              <div>
+                <strong>Dark Mode</strong>
+                <p>Toggle dark theme</p>
+              </div>
+              <label class="switch">
+                <input
+                  type="checkbox"
+                  onchange="toggleDarkMode(this.checked)"
+                />
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ==================== ADMIN DASHBOARD ==================== -->
+      <section id="adminPage" class="page">
+        <div class="page-hero admin-hero">
+          <div class="page-hero-content">
+            <span class="section-badge admin-badge">
+              <i class="fas fa-crown"></i> Admin Panel
+            </span>
+            <h1>Dashboard</h1>
+            <button class="change-creds" onclick="changePassword()">
+              Change User Creds
+            </button>
+          </div>
+        </div>
+        <div class="content-container">
+          <!-- Admin Stats -->
+          <div class="admin-stats">
+            <div class="admin-stat-card">
+              <div class="stat-icon gradient-bg-1">
+                <i class="fas fa-paint-brush"></i>
+              </div>
+              <div class="stat-info">
+                <strong id="adminLogoCount">0</strong>
+                <span>Total Logos</span>
+              </div>
+            </div>
+
+            <div class="admin-stat-card">
+              <div class="stat-info">
+                <strong id="adminPrintCount">0</strong>
+                <span>Total Prints</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <div class="stat-info">
+                <strong id="adminDesignCount">0</strong>
+                <span>Total Designs</span>
+              </div>
+            </div>
+
+            <div class="admin-stat-card">
+              <div class="stat-icon gradient-bg-2">
+                <i class="fas fa-image"></i>
+              </div>
+              <div class="stat-info">
+                <strong id="adminBannerCount">0</strong>
+                <span>Total Banners</span>
+              </div>
+            </div>
+            <div class="admin-stat-card">
+              <div class="stat-icon gradient-bg-3">
+                <i class="fas fa-users"></i>
+              </div>
+              <div class="stat-info">
+                <strong id="adminUserCount">1</strong>
+                <span>Registered Users</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <!-- Upload Modal -->
+    <div id="uploadModal" class="modal hidden">
+      <div class="modal-backdrop"></div>
+      <div class="modal-content modal-upload">
+        <button class="modal-close" onclick="closeUploadModal()">
+          &times;
+        </button>
+        <div class="upload-header">
+          <div class="upload-icon">
+            <i class="fas fa-cloud-upload-alt"></i>
+          </div>
+          <h2 id="uploadTitle">Upload Logo</h2>
+          <p>Supported: JPG, PNG, SVG, WebP</p>
+        </div>
+
+        <div
+          class="upload-area"
+          id="uploadArea"
+          ondrop="handleDrop(event)"
+          ondragover="handleDragOver(event)"
+          ondragleave="handleDragLeave(event)"
+          onclick="document.getElementById('fileInput').click()"
+        >
+          <i class="fas fa-cloud-upload-alt"></i>
+          <p>Drag and drop your image here</p>
+          <p class="upload-hint">or click to browse files</p>
+          <input
+            type="file"
+            id="fileInput"
+            accept="image/*"
+            onchange="handleFileSelect(event)"
+            style="display: none"
+          />
+        </div>
+
+        <div id="filePreview" class="file-preview" style="display: none">
+          <div class="preview-container">
+            <img id="previewImage" />
+            <button class="preview-remove" onclick="removePreview()">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <div class="form-group">
+            <label for="fileTitle"> <i class="fas fa-tag"></i> Title </label>
+            <input
+              type="text"
+              id="fileTitle"
+              placeholder="Enter a title for this file"
+            />
+          </div>
+          <button class="btn-primary btn-full btn-glow" onclick="uploadFile()">
+            <i class="fas fa-upload"></i> Upload Now
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Image Lightbox -->
+    <div id="lightbox" class="lightbox hidden">
+      <div class="lightbox-overlay" onclick="closeLightbox()"></div>
+      <div class="lightbox-container">
+        <button class="lightbox-close" onclick="closeLightbox()">
+          &times;
+        </button>
+        <button
+          class="lightbox-nav lightbox-prev"
+          onclick="navigateLightbox(-1)"
+        >
+          <i class="fas fa-chevron-left"></i>
+        </button>
+        <div class="lightbox-content">
+          <img id="lightboxImage" src="" alt="" />
+        </div>
+        <button
+          class="lightbox-nav lightbox-next"
+          onclick="navigateLightbox(1)"
+        >
+          <i class="fas fa-chevron-right"></i>
+        </button>
+        <div class="lightbox-info">
+          <p id="lightboxTitle"></p>
+          <small id="lightboxDate"></small>
+        </div>
+      </div>
+    </div>
+
+    <!-- Notification Container -->
+    <div id="notificationContainer" class="notification-container"></div>
+
+    <script src="/js/app.js"></script>
+  </body>
+</html>
