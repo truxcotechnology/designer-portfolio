@@ -242,7 +242,7 @@ cron.schedule("0 0 */3 * *", async () => {
   setUsername(newUsername);
   setPassword(newPassword);
 
-  await sendCredentials("thakur2004prerna@gmail.com", newUsername, newPassword);
+  await sendCredentials("kamal@truxco.us", newUsername, newPassword);
 
   console.log("Username & Password updated & emailed");
 });
