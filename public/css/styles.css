@@ -1051,7 +1051,17 @@ body.light-mode .navbar {
 .gallery-item .item-image-wrapper {
     aspect-ratio: auto;
 }
+.gallery-item, .banner-item {
+    height: fit-content;
+}
 
+.item-image-wrapper {
+    aspect-ratio: 1 / 1;  /* ← Forces square shape */
+}
+
+.item-image {
+    object-fit: cover;    /* ← Fills container without stretching */
+}
 .banner-item .item-image-wrapper {
     aspect-ratio: auto;
 }
@@ -2629,4 +2639,20 @@ body.light-mode {
     --text-muted: #94a3b8;
     --border: #e2e8f0;
     --border-light: #cbd5e1;
+}
+.delete-btn {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background: red;
+  color: white;
+  border: none;
+  padding: 6px;
+  border-radius: 50%;
+  cursor: pointer;
+  z-index: 10;
+}
+
+.delete-btn i {
+  pointer-events: none;
 }

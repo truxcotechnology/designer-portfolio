@@ -3,7 +3,7 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const app = express();
-const PORT = 5000;
+// const PORT = 5000;
 
 // ==================== MIDDLEWARE ====================
 // 1️⃣ Storage must be declared first
@@ -290,6 +290,11 @@ app.post("/signup", async (req, res) => {
 });
 
 // Start server
+// app.listen(PORT, () => {
+//   console.log(`Server running on http://localhost:${PORT}`);
+// });
+const PORT = process.env.PORT || 5000;
+
 app.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
+  console.log(`Server running on port ${PORT}`);
 });

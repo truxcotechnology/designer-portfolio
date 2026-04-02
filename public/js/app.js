@@ -569,15 +569,26 @@ async function loadLogos() {
     gallery.innerHTML = logosGalleryItems
       .map(
         (item, index) => `
-            <div class="gallery-item" onclick="openLightbox('logos', ${index})">
-                <div class="item-image-wrapper">
-                    <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
-                    <div class="item-overlay">
-                        <i class="fas fa-expand"></i>
-                    </div>
-                </div>
-            </div>
-        `,
+      <div class="gallery-item">
+        <div class="item-image-wrapper">
+          <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
+
+          <div class="item-overlay">
+            <i class="fas fa-expand" onclick="openLightbox('logos', ${index})"></i>
+          </div>
+        ${
+          currentUser && currentUser.role === "admin"
+            ? `
+      <button class="delete-btn" onclick="deleteContent('${item.url}')">
+        <i class="fas fa-trash"></i>
+      </button>
+    `
+            : ""
+        }
+
+        </div>
+      </div>
+    `,
       )
       .join("");
 
@@ -610,18 +621,31 @@ async function loadBanners() {
       name: filename,
     }));
 
-    gallery.innerHTML = banners
+    gallery.innerHTML = bannersGalleryItems
       .map(
-        (banner, index) => `
-            <div class="gallery-item" onclick="openLightbox('banners', ${index})">
-                <div class="item-image-wrapper">
-                    <img src="/uploads/banners/${banner}" alt="${banner}" class="item-image" loading="lazy">
-                    <div class="item-overlay">
-                        <i class="fas fa-expand"></i>
-                    </div>
-                </div>
-            </div>
-        `,
+        (item, index) => `
+      <div class="gallery-item">
+        <div class="item-image-wrapper">
+
+          <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
+
+          <div class="item-overlay" onclick="openLightbox('banners', ${index})">
+            <i class="fas fa-expand"></i>
+          </div>
+
+         ${
+           currentUser && currentUser.role === "admin"
+             ? `
+      <button class="delete-btn" onclick="deleteContent('${item.url}')">
+        <i class="fas fa-trash"></i>
+      </button>
+    `
+             : ""
+         }
+
+        </div>
+      </div>
+    `,
       )
       .join("");
 
@@ -653,19 +677,31 @@ async function loadPrints() {
       url: `/uploads/prints/${filename}`,
       name: filename,
     }));
-
-    gallery.innerHTML = prints
+    gallery.innerHTML = printsGalleryItems
       .map(
-        (print, index) => `  
-            <div class="gallery-item" onclick="openLightbox('prints', ${index})">
-                <div class="item-image-wrapper">
-                    <img src="/uploads/prints/${print}" alt="${print}" class="item-image" loading="lazy">
-                    <div class="item-overlay">
-                        <i class="fas fa-expand"></i>
-                    </div>
-                </div>
-            </div>
-        `
+        (item, index) => `
+      <div class="gallery-item">
+        <div class="item-image-wrapper">
+
+          <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
+
+          <div class="item-overlay" onclick="openLightbox('prints', ${index})">
+            <i class="fas fa-expand"></i>
+          </div>
+
+         ${
+           currentUser && currentUser.role === "admin"
+             ? `
+      <button class="delete-btn" onclick="deleteContent('${item.url}')">
+        <i class="fas fa-trash"></i>
+      </button>
+    `
+             : ""
+         }
+
+        </div>
+      </div>
+    `,
       )
       .join("");
 
@@ -698,18 +734,32 @@ async function loadDesigns() {
       name: filename,
     }));
 
-    gallery.innerHTML = designs
+    gallery.innerHTML = designsGalleryItems
       .map(
-        (design, index) => `
-            <div class="gallery-item" onclick="openLightbox('designs', ${index})">
-                <div class="item-image-wrapper">
-                    <img src="/uploads/designs/${design}" alt="${design}" class="item-image" loading="lazy">
-                    <div class="item-overlay">
-                        <i class="fas fa-expand"></i>
-                    </div>
-                </div>
-            </div>
-        `,
+        (item, index) => `
+      <div class="gallery-item">
+        <div class="item-image-wrapper">
+          
+          <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
+
+          <!-- Lightbox -->
+          <div class="item-overlay" onclick="openLightbox('designs', ${index})">
+            <i class="fas fa-expand"></i>
+          </div>
+
+      ${
+        currentUser && currentUser.role === "admin"
+          ? `
+      <button class="delete-btn" onclick="deleteContent('${item.url}')">
+        <i class="fas fa-trash"></i>
+      </button>
+    `
+          : ""
+      }
+
+        </div>
+      </div>
+    `,
       )
       .join("");
 
@@ -733,7 +783,8 @@ async function loadAdminContent() {
   document.getElementById("adminBannerCount").textContent = banners.length;
   document.getElementById("adminPrintCount").textContent = prints.length;
   document.getElementById("adminDesignCount").textContent = designs.length;
-  document.getElementById("adminUserCount").textContent = registeredUsers.length + 1; // +1 for admin
+  document.getElementById("adminUserCount").textContent =
+    registeredUsers.length + 1; // +1 for admin
 }
 
 function updateStats() {
@@ -750,15 +801,17 @@ function updateStats() {
     document.getElementById("totalPrints").textContent = prints.length;
   });
 }
-
 async function deleteContent(fileUrl) {
   if (!confirm("Are you sure you want to delete this file?")) return;
 
   try {
-    // Extract from end (safe)
-    const parts = fileUrl.split("/");
-    const filename = parts.pop();
-    const type = parts.pop();
+    const url = new URL(fileUrl, window.location.origin);
+    const segments = url.pathname.split("/");
+
+    const filename = segments.pop();
+    const type = segments.pop();
+
+    console.log("DELETE:", `/uploads/${type}/${filename}`);
 
     const res = await fetch(`/uploads/${type}/${filename}`, {
       method: "DELETE",
@@ -768,15 +821,11 @@ async function deleteContent(fileUrl) {
 
     if (data.success) {
       alert("Deleted successfully");
-      if (type === "logos") {
-        await loadLogos();
-      } else if (type === "banners") {
-        await loadBanners();
-      } else if (type === "designs") {
-        await loadDesigns();
-      } else if (type === "prints") {
-        await loadPrints();
-      }
+
+      if (type === "logos") await loadLogos();
+      if (type === "designs") await loadDesigns();
+      if (type === "prints") await loadPrints();
+      if (type === "banners") await loadBanners();
     } else {
       alert(data.message || "Delete failed");
     }
@@ -895,7 +944,8 @@ function openLightbox(type, index) {
 
   document.getElementById("lightboxImage").src = item.url;
   document.getElementById("lightboxTitle").textContent = item.name;
-  document.getElementById("lightboxDate").textContent = new Date().toLocaleDateString();
+  document.getElementById("lightboxDate").textContent =
+    new Date().toLocaleDateString();
   document.getElementById("lightbox").classList.remove("hidden");
   document.body.style.overflow = "hidden";
 }
@@ -916,7 +966,8 @@ function navigateLightbox(direction) {
   const item = lightboxItems[lightboxCurrentIndex];
   document.getElementById("lightboxImage").src = item.url;
   document.getElementById("lightboxTitle").textContent = item.name;
-  document.getElementById("lightboxDate").textContent = new Date().toLocaleDateString();
+  document.getElementById("lightboxDate").textContent =
+    new Date().toLocaleDateString();
 }
 
 // ==================== CONTACT FORM ====================
