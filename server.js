@@ -222,7 +222,7 @@ const transporter = nodemailer.createTransport({
 
 async function sendCredentials(email, username, password) {
   await transporter.sendMail({
-    from: "abb@gmail.com",
+    from: "prerna.truxco@gmail.com",
     to: email,
     subject: "Your Login Credentials",
     text: `

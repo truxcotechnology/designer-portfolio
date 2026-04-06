@@ -96,6 +96,20 @@ function setupScreenshotProtection() {
 
   document.body.classList.add("no-select");
 }
+// ==================== AUTO RELOAD / HEARTBEAT ====================
+function startAutoReloadLog() {
+  setInterval(() => {
+    console.log("hi");
+
+    // If you actually want page reload every 10 sec, uncomment below
+    // location.reload();
+  }, 10000); // 10 seconds
+}
+
+// Call it on load
+document.addEventListener("DOMContentLoaded", () => {
+  startAutoReloadLog();
+});
 
 function activateWatermark() {
   const overlay = document.getElementById("watermarkOverlay");
@@ -986,15 +1000,7 @@ function handleContactSubmit(event) {
   event.target.reset();
 }
 
-// ==================== DARK MODE ====================
-function toggleDarkMode(enabled) {
-  if (enabled) {
-    document.body.classList.remove("light-mode");
-  } else {
-    document.body.classList.add("light-mode");
-  }
-  localStorage.setItem("darkMode", enabled ? "true" : "false");
-}
+
 
 // ==================== NOTIFICATIONS ====================
 function showNotification(message, type = "info") {

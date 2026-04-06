@@ -36,7 +36,7 @@
         <div class="auth-tab active">
           <div class="auth-header">
             <h2>Welcome</h2>
-            <p>Login  to access premium content</p>
+            <p>Sign in to access premium content</p>
           </div>
           <form onsubmit="handleLogin(event)">
             <div class="form-group">
@@ -72,7 +72,7 @@
             </div>
 
             <button type="submit" class="btn-primary btn-full btn-glow">
-              <i class="fas fa-sign-in-alt"></i> Login
+              <i class="fas fa-sign-in-alt"></i> Sign In
             </button>
             <p class="form-toggle">Use provided credentials to login</p>
           </form>
@@ -173,9 +173,7 @@
                 <a onclick="navigateTo('profile')" class="dropdown-item">
                   <i class="fas fa-user"></i> My Profile
                 </a>
-                <a onclick="navigateTo('settings')" class="dropdown-item">
-                  <i class="fas fa-cog"></i> Settings
-                </a>
+               
                 <div class="dropdown-divider"></div>
                 <a onclick="handleLogout()" class="dropdown-item text-danger">
                   <i class="fas fa-sign-out-alt"></i> Logout
@@ -191,13 +189,7 @@
     <main class="main-content" id="mainContent">
       <!-- ==================== LOGOS PAGE (Protected) ==================== -->
       <section id="logosPage" class="page protected-page active">
-        <div class="page-hero">
-          <div class="page-hero-content">
-            <span class="section-badge">Portfolio</span>
-            <h1>Logo <span class="gradient-text">Collection</span></h1>
-            <p>Premium logos crafted for modern brands</p>
-          </div>
-        </div>
+        
         <div class="content-container">
           <!-- Admin Upload Button -->
           <div
@@ -235,9 +227,7 @@
       <section id="bannersPage" class="page protected-page">
         <div class="page-hero">
           <div class="page-hero-content">
-            <span class="section-badge">Portfolio</span>
-            <h1>Banner <span class="gradient-text">Gallery</span></h1>
-            <p>Professional banners for your campaigns</p>
+          
           </div>
         </div>
 
@@ -278,13 +268,7 @@
 
       <!-- ==================== DESIGNS PAGE (Protected) ==================== -->
       <section id="designsPage" class="page protected-page">
-        <div class="page-hero">
-          <div class="page-hero-content">
-            <span class="section-badge">Portfolio</span>
-            <h1>Design <span class="gradient-text">Uploads</span></h1>
-            <p>Professional designs and print materials</p>
-          </div>
-        </div>
+       
 
         <div class="content-container">
           <!-- Admin Upload Button -->
@@ -323,14 +307,7 @@
 
       <!-- ==================== Print PAGE (Protected) ==================== -->
       <section id="printsPage" class="page protected-page">
-        <div class="page-hero">
-          <div class="page-hero-content">
-            <span class="section-badge">Portfolio</span>
-            <h1>Print <span class="gradient-text">Uploads</span></h1>
-            <p>Professional prints materials</p>
-          </div>
-        </div>
-
+     
         <div class="content-container">
           <!-- Admin Upload Button -->
           <div
@@ -401,46 +378,13 @@
         </div>
       </section>
 
-      <!-- ==================== SETTINGS PAGE ==================== -->
-      <section id="settingsPage" class="page">
-        <div class="page-hero">
-          <div class="page-hero-content">
-            <span class="section-badge">Preferences</span>
-            <h1>Account <span class="gradient-text">Settings</span></h1>
-            <p>Customize your experience</p>
-          </div>
-        </div>
-        <div class="content-container">
-          <div class="settings-card">
-            <div class="setting-row">
-              <div>
-                <strong>Dark Mode</strong>
-                <p>Toggle dark theme</p>
-              </div>
-              <label class="switch">
-                <input
-                  type="checkbox"
-                  onchange="toggleDarkMode(this.checked)"
-                />
-                <span class="slider"></span>
-              </label>
-            </div>
-          </div>
-        </div>
-      </section>
-
       <!-- ==================== ADMIN DASHBOARD ==================== -->
       <section id="adminPage" class="page">
         <div class="page-hero admin-hero">
-          <div class="page-hero-content">
-            <span class="section-badge admin-badge">
-              <i class="fas fa-crown"></i> Admin Panel
-            </span>
-            <h1>Dashboard</h1>
+         
             <button class="change-creds" onclick="changePassword()">
               Change User Creds
             </button>
-          </div>
         </div>
         <div class="content-container">
           <!-- Admin Stats -->
