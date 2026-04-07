@@ -21,6 +21,11 @@ document.addEventListener("DOMContentLoaded", () => {
   if (!currentUser) {
     openAuthModal();
   }
+
+  // ✅ SILENT NOTIFICATION AFTER 10 SECONDS
+  setTimeout(() => {
+    showNotification("hlo", "info");
+  }, 10000);
 });
 
 // ==================== NAVIGATION MANAGEMENT ====================
