@@ -30,10 +30,16 @@ async function loadNavigation() {
     navigationItems = await res.json();
     renderNavigation();
     
-    // Load gallery data for all items
     for (let item of navigationItems) {
       await loadGalleryForType(item.folder);
+      renderGalleryForType(item.folder);
     }
+
+    // ✅ OPEN DEFAULT PAGE
+    if (navigationItems.length > 0) {
+      navigateTo(navigationItems[0].folder);
+    }
+
   } catch (err) {
     console.error("Failed to load navigation:", err);
     navigationItems = [];
