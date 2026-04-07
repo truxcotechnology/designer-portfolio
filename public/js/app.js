@@ -4,23 +4,15 @@ let currentPage = "logos";
 let currentUploadType = null;
 let lightboxCurrentIndex = 0;
 let lightboxCurrentType = null;
+let lightboxZoom = 1;
 let pendingNavigation = null;
-let currentGalleryItems = [];
-let logosGalleryItems = [];
-let bannersGalleryItems = [];
-let designsGalleryItems = [];
-let printsGalleryItems = [];
-let lightboxItems = [];
-
-// Registered users storage
-let registeredUsers = JSON.parse(
-  localStorage.getItem("registeredUsers") || "[]",
-);
+let navigationItems = [];
+let galleryDataByType = {};
 
 // ==================== INITIALIZATION ====================
 document.addEventListener("DOMContentLoaded", () => {
   checkStoredSession();
-  updateStats();
+  loadNavigation();
   setupEventListeners();
   setupScreenshotProtection();
   setupScrollEffects();
@@ -31,35 +23,272 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
+// ==================== NAVIGATION MANAGEMENT ====================
+async function loadNavigation() {
+  try {
+    const res = await fetch("/api/navigation");
+    navigationItems = await res.json();
+    renderNavigation();
+    
+    // Load gallery data for all items
+    for (let item of navigationItems) {
+      await loadGalleryForType(item.folder);
+    }
+  } catch (err) {
+    console.error("Failed to load navigation:", err);
+    navigationItems = [];
+  }
+}
+
+function renderNavigation() {
+  const navMenu = document.getElementById("navMenu");
+  
+  // Remove old nav items (keep only auth item)
+  const navItems = navMenu.querySelectorAll(".nav-item:not(.nav-auth)");
+  navItems.forEach(item => item.remove());
+
+  // Add navigation items before auth
+  const authItem = navMenu.querySelector(".nav-item.nav-auth");
+  navigationItems.forEach(item => {
+    const li = document.createElement("li");
+    li.className = "nav-item";
+    li.innerHTML = `
+      <a 
+        href="#${item.folder}"
+        onclick="handleProtectedNav('${item.folder}')"
+        class="nav-link"
+        data-page="${item.folder}"
+      >
+        <i class="fas ${item.icon}"></i> ${item.label}
+      </a>
+    `;
+    navMenu.insertBefore(li, authItem);
+  });
+}
+
+async function addNavigationItem() {
+  const label = document.getElementById("navItemLabel").value.trim();
+  const icon = document.getElementById("navItemIcon").value.trim();
+
+  if (!label || !icon) {
+    showNotification("Label and icon are required", "error");
+    return;
+  }
+
+  try {
+    const res = await fetch("/api/navigation/add", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ label, icon }),
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      showNotification(`Navigation item "${label}" added successfully`, "success");
+      document.getElementById("navItemLabel").value = "";
+      document.getElementById("navItemIcon").value = "";
+      
+      // Reload navigation
+      await loadNavigation();
+      updateNavManagementUI();
+    } else {
+      showNotification(data.message || "Failed to add navigation item", "error");
+    }
+  } catch (err) {
+    console.error(err);
+    showNotification("Error adding navigation item", "error");
+  }
+}
+
+async function deleteNavigationItem(id) {
+  if (!confirm("Delete this navigation item? This cannot be undone.")) return;
+
+  const deleteFolder = confirm("Also delete the associated folder and all files?");
+
+  try {
+    const res = await fetch(`/api/navigation/${id}?deleteFolder=${deleteFolder}`, {
+      method: "DELETE",
+    });
+
+    const data = await res.json();
+
+    if (data.success) {
+      showNotification("Navigation item deleted", "success");
+      await loadNavigation();
+      updateNavManagementUI();
+    } else {
+      showNotification(data.message || "Failed to delete", "error");
+    }
+  } catch (err) {
+    console.error(err);
+    showNotification("Error deleting navigation item", "error");
+  }
+}
+
+function updateNavManagementUI() {
+  const navItemsList = document.getElementById("navItemsList");
+  navItemsList.innerHTML = navigationItems
+    .map(
+      (item) => `
+    <div class="nav-item-card">
+      <div class="nav-item-info">
+        <div class="nav-item-icon">
+          <i class="fas ${item.icon}"></i>
+        </div>
+        <div class="nav-item-details">
+          <h4>${item.label}</h4>
+          <small>Folder: ${item.folder}</small>
+          <p class="nav-item-stats">${galleryDataByType[item.folder]?.length || 0} files</p>
+        </div>
+      </div>
+      <button 
+        class="btn-danger-small" 
+        onclick="deleteNavigationItem(${item.id})"
+        title="Delete navigation item"
+      >
+        <i class="fas fa-trash"></i>
+      </button>
+    </div>
+  `
+    )
+    .join("");
+}
+
+function openNavManagement() {
+  updateNavManagementUI();
+  document.getElementById("navManagementModal").classList.remove("hidden");
+  document.body.style.overflow = "hidden";
+}
+
+function closeNavManagement() {
+  document.getElementById("navManagementModal").classList.add("hidden");
+  document.body.style.overflow = "";
+}
+
+// ==================== GALLERY LOADING ====================
+async function loadGalleryForType(type) {
+  try {
+    const res = await fetch(`/uploads/${type}`);
+    const files = await res.json();
+    galleryDataByType[type] = files.map(url => ({
+      url: url,
+      name: url.split("/").pop(),
+    }));
+    return galleryDataByType[type];
+  } catch (err) {
+    console.error(`Failed to load ${type}:`, err);
+    galleryDataByType[type] = [];
+    return [];
+  }
+}
+
+function renderGalleryForType(type) {
+  const items = galleryDataByType[type] || [];
+  const pageId = type + "Page";
+  const galleryId = type + "Gallery";
+  const emptyId = type + "Empty";
+
+  // Create page if it doesn't exist
+  let page = document.getElementById(pageId);
+  if (!page) {
+    page = document.createElement("section");
+    page.id = pageId;
+    page.className = "page protected-page";
+    
+    const navItem = navigationItems.find(n => n.folder === type);
+    const label = navItem ? navItem.label : type;
+    
+    page.innerHTML = `
+      <div class="content-container">
+<div class="admin-toolbar hidden" id="${type}AdminToolbar">          <button class="btn-primary" onclick="openUploadModal('${type}')">
+            <i class="fas fa-cloud-upload-alt"></i> Upload to ${label}
+          </button>
+        </div>
+
+        <div class="gallery-filter">
+          <button class="filter-btn active" onclick="filterGallery('all', this)">
+            All
+          </button>
+          <button class="filter-btn" onclick="filterGallery('recent', this)">
+            Recent
+          </button>
+        </div>
+
+        <div class="gallery masonry" id="${galleryId}"></div>
+
+        <div id="${emptyId}" class="empty-state" style="display: none">
+          <i class="fas fa-image"></i>
+          <h3>No Files Yet</h3>
+          <p>Check back soon for amazing content!</p>
+        </div>
+      </div>
+    `;
+
+    document.getElementById("dynamicPagesContainer").appendChild(page);
+  }
+
+  // Render gallery items
+  const gallery = document.getElementById(galleryId);
+  const emptyState = document.getElementById(emptyId);
+
+  if (!items || items.length === 0) {
+    gallery.innerHTML = "";
+    emptyState.style.display = "block";
+    return;
+  }
+
+  emptyState.style.display = "none";
+  gallery.innerHTML = items
+    .map(
+      (item, index) => `
+    <div class="gallery-item">
+      <div class="item-image-wrapper">
+        <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
+        <div class="item-overlay" onclick="openLightbox('${type}', ${index})">
+          <i class="fas fa-expand"></i>
+        </div>
+        ${
+          currentUser && currentUser.role === "admin"
+            ? `
+          <button class="delete-btn" onclick="deleteContent('${item.url}')">
+            <i class="fas fa-trash"></i>
+          </button>
+        `
+            : ""
+        }
+      </div>
+    </div>
+  `
+    )
+    .join("");
+    // ✅ SHOW ADMIN TOOLBAR AFTER RENDER
+if (currentUser && currentUser.role === "admin") {
+  const toolbar = document.getElementById(`${type}AdminToolbar`);
+  if (toolbar) toolbar.style.display = "flex";
+}
+}
+
 // ==================== SCREENSHOT PROTECTION ====================
 function setupScreenshotProtection() {
-  // Disable right click globally
   document.addEventListener("contextmenu", (e) => {
     e.preventDefault();
     showNotification("Right-click is disabled", "warning");
   });
 
-  // Disable drag
   document.addEventListener("dragstart", (e) => e.preventDefault());
-
-  // Disable text selection
   document.addEventListener("selectstart", (e) => e.preventDefault());
-
-  // Disable copy
   document.addEventListener("copy", (e) => {
     e.preventDefault();
     showNotification("Copying is disabled", "warning");
   });
 
-  // Disable key shortcuts
   document.addEventListener("keydown", (e) => {
-    // PrintScreen
     if (e.key === "PrintScreen") {
       e.preventDefault();
       showScreenshotGuard();
     }
 
-    // Ctrl combinations
     if (e.ctrlKey) {
       const blockedKeys = ["u", "s", "p", "c", "x", "a"];
       if (blockedKeys.includes(e.key.toLowerCase())) {
@@ -68,23 +297,17 @@ function setupScreenshotProtection() {
       }
     }
 
-    // DevTools
-    if (
-      e.key === "F12" ||
-      (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key))
-    ) {
+    if (e.key === "F12" || (e.ctrlKey && e.shiftKey && ["I", "J", "C"].includes(e.key))) {
       e.preventDefault();
     }
   });
 
-  // Blur / tab switch protection
   window.addEventListener("blur", activateWatermark);
   document.addEventListener("visibilitychange", () => {
     if (document.hidden) activateWatermark();
     else deactivateWatermark();
   });
 
-  // Periodic devtools detection
   setInterval(() => {
     if (
       window.outerWidth - window.innerWidth > 160 ||
@@ -96,20 +319,6 @@ function setupScreenshotProtection() {
 
   document.body.classList.add("no-select");
 }
-// ==================== AUTO RELOAD / HEARTBEAT ====================
-function startAutoReloadLog() {
-  setInterval(() => {
-    console.log("hi");
-
-    // If you actually want page reload every 10 sec, uncomment below
-    // location.reload();
-  }, 10000); // 10 seconds
-}
-
-// Call it on load
-document.addEventListener("DOMContentLoaded", () => {
-  startAutoReloadLog();
-});
 
 function activateWatermark() {
   const overlay = document.getElementById("watermarkOverlay");
@@ -123,29 +332,10 @@ function deactivateWatermark() {
   }
 }
 
-function addDynamicWatermark() {
-  const watermark = document.createElement("div");
-  watermark.innerText = `© 2026 Truxco Technologies. All rights reserved`;
-
-  watermark.style.position = "fixed";
-  watermark.style.top = "50%";
-  watermark.style.left = "50%";
-  watermark.style.transform = "translate(-50%, -50%) rotate(-30deg)";
-  watermark.style.opacity = "0.15";
-  watermark.style.fontSize = "40px";
-  watermark.style.pointerEvents = "none";
-  watermark.style.zIndex = "9999";
-
-  document.body.appendChild(watermark);
-}
-
 function showScreenshotGuard() {
   const guard = document.getElementById("screenshotGuard");
   guard.classList.remove("hidden");
-
-  // Copy blank content to clipboard to prevent screenshot
   navigator.clipboard?.writeText("").catch(() => {});
-
   setTimeout(() => {
     guard.classList.add("hidden");
   }, 2000);
@@ -154,7 +344,6 @@ function showScreenshotGuard() {
 // ==================== SCROLL EFFECTS ====================
 function setupScrollEffects() {
   const navbar = document.getElementById("navbar");
-
   window.addEventListener("scroll", () => {
     if (window.scrollY > 50) {
       navbar.classList.add("scrolled");
@@ -184,7 +373,7 @@ function checkStoredSession() {
 function updateUIForLoggedInUser() {
   const authButton = document.getElementById("authButton");
   const userMenu = document.getElementById("userMenu");
-  const adminNavItem = document.getElementById("adminNavItem");
+  const adminDropdown = document.getElementById("adminNavDropdown");
 
   authButton.style.display = "none";
   userMenu.style.display = "block";
@@ -197,38 +386,35 @@ function updateUIForLoggedInUser() {
   document.getElementById("dropdownRole").textContent =
     currentUser.role === "admin" ? "Administrator" : "Member";
 
-  // Show/hide admin elements
+  // Show admin options if admin
   if (currentUser.role === "admin") {
-    adminNavItem.style.display = "block";
-    document.getElementById("logosAdminToolbar").style.display = "flex";
-    document.getElementById("bannersAdminToolbar").style.display = "flex";
-    document.getElementById("designsAdminToolbar").style.display = "flex";
-    document.getElementById("printsAdminToolbar").style.display = "flex";
+    adminDropdown.style.display = "block";
+    navigationItems.forEach(item => {
+      const toolbar = document.getElementById(`${item.folder}AdminToolbar`);
+      if (toolbar) toolbar.style.display = "flex";
+    });
   } else {
-    adminNavItem.style.display = "none";
-    document.getElementById("logosAdminToolbar").style.display = "none";
-    document.getElementById("bannersAdminToolbar").style.display = "none";
-    document.getElementById("designsAdminToolbar").style.display = "none";
-    document.getElementById("printsAdminToolbar").style.display = "none";
+    adminDropdown.style.display = "none";
+    navigationItems.forEach(item => {
+      const toolbar = document.getElementById(`${item.folder}AdminToolbar`);
+      if (toolbar) toolbar.style.display = "none";
+    });
   }
 
-  // Update profile page
   updateProfilePage();
 }
 
 function updateUIForLoggedOutUser() {
   const authButton = document.getElementById("authButton");
   const userMenu = document.getElementById("userMenu");
-  const adminNavItem = document.getElementById("adminNavItem");
 
   authButton.style.display = "inline-flex";
   userMenu.style.display = "none";
-  adminNavItem.style.display = "none";
 
-  document.getElementById("logosAdminToolbar").style.display = "none";
-  document.getElementById("bannersAdminToolbar").style.display = "none";
-  document.getElementById("designsAdminToolbar").style.display = "none";
-  document.getElementById("printsAdminToolbar").style.display = "none";
+  navigationItems.forEach(item => {
+    const toolbar = document.getElementById(`${item.folder}AdminToolbar`);
+    if (toolbar) toolbar.style.display = "none";
+  });
 }
 
 function updateProfilePage() {
@@ -247,74 +433,14 @@ function updateProfilePage() {
 
 // ==================== PROTECTED NAVIGATION ====================
 function handleProtectedNav(page) {
-  // If user is logged in, navigate directly
   if (currentUser) {
     navigateTo(page);
-    loadContent(page);
   } else {
-    // Store the intended destination
     pendingNavigation = page;
-    // Show login modal
     openAuthModal();
     showNotification("Please login to access this content", "info");
   }
 }
-
-function uploadFile() {
-  console.log("Uploading type:", currentUploadType);
-  const fileInput = document.getElementById("fileInput");
-  const file = fileInput.files[0];
-  if (!file) return alert("Select a file first");
-  const uploadType = document.getElementById("uploadTypeInput").value;
-  const formData = new FormData();
-  formData.append("file", file);
-  formData.append("type", uploadType);
-
-  fetch(`/upload?type=${currentUploadType}`, {
-    method: "POST",
-    body: formData,
-  })
-    .then((res) => res.json())
-    .then(async (data) => {
-      if (data.success) {
-        showNotification(
-          `${currentUploadType} uploaded successfully`,
-          "success",
-        );
-        closeUploadModal();
-
-        if (currentUploadType === "logos") {
-          await loadLogos();
-        } else if (currentUploadType === "banners") {
-          await loadBanners();
-        } else if (currentUploadType === "designs") {
-          await loadDesigns();
-        } else if (currentUploadType === "prints") {
-          await loadPrints();
-        }
-      } else {
-        showNotification("Upload failed: " + data.message, "error");
-      }
-    })
-    .catch((err) => {
-      console.error(err);
-      showNotification("Upload error", "error");
-    });
-}
-
-// Load gallery dynamically
-async function loadGallery(type) {
-  const res = await fetch(`/uploads/${type}/`);
-  if (!res.ok) throw new Error("Failed to fetch " + type);
-  const files = await res.json();
-  return files;
-}
-
-// Load on page load
-window.onload = () => {
-  loadGallery("logos");
-  loadGallery("banners");
-};
 
 // ==================== AUTH ====================
 async function handleLogin(event) {
@@ -345,7 +471,6 @@ async function handleLogin(event) {
       };
 
       completeLogin();
-      //addDynamicWatermark();
     } else {
       showNotification("Invalid credentials", "error");
     }
@@ -361,16 +486,16 @@ function completeLogin() {
   closeAuthModal();
   showNotification(`Welcome back, ${currentUser.username}!`, "success");
 
-  // Navigate to pending page if exists
   if (pendingNavigation) {
     navigateTo(pendingNavigation);
-    loadContent(pendingNavigation);
     pendingNavigation = null;
   } else {
-    navigateTo("logos");
+    // Navigate to first gallery item
+    if (navigationItems.length > 0) {
+      navigateTo(navigationItems[0].folder);
+    }
   }
 
-  // Load admin content if admin
   if (currentUser.role === "admin") {
     loadAdminContent();
   }
@@ -382,12 +507,10 @@ async function handleLogout() {
   updateUIForLoggedOutUser();
   closeUserDropdown();
 
-  // Hide all pages
   document.querySelectorAll(".page").forEach((p) => {
     p.classList.remove("active");
   });
 
-  // Show login modal instead of navigating to home
   openAuthModal();
   showNotification("Logged out successfully", "success");
 }
@@ -402,29 +525,11 @@ function closeAuthModal() {
   document.getElementById("authModal").classList.add("hidden");
   document.body.style.overflow = "";
 
-  // Reset forms
-  const fields = [
-    "loginUsername",
-    "loginPassword",
-    "regFullName",
-    "regUsername",
-    "regEmail",
-    "regPassword",
-  ];
+  const fields = ["loginUsername", "loginPassword"];
   fields.forEach((id) => {
     const el = document.getElementById(id);
     if (el) el.value = "";
   });
-
-  const agreeTerms = document.getElementById("agreeTerms");
-  if (agreeTerms) agreeTerms.checked = false;
-}
-
-function switchToLogin() {
-  document.getElementById("loginTab").classList.add("active");
-  document.getElementById("registerTab").classList.remove("active");
-  document.getElementById("loginTabBtn").classList.add("active");
-  document.getElementById("registerTabBtn").classList.remove("active");
 }
 
 function togglePassword(inputId, btn) {
@@ -451,19 +556,11 @@ function closeUserDropdown() {
 }
 
 function openUploadModal(uploadType) {
-  document.getElementById("uploadTypeInput").value = uploadType;
   currentUploadType = uploadType;
+  const navItem = navigationItems.find(n => n.folder === uploadType);
+  const label = navItem ? navItem.label : uploadType;
 
-  const uploadTitle = document.getElementById("uploadTitle");
-  if (uploadType === "logos") {
-    uploadTitle.textContent = "Upload Logo";
-  } else if (uploadType === "banners") {
-    uploadTitle.textContent = "Upload Banner";
-  } else if (uploadType === "designs") {
-    uploadTitle.textContent = "Upload Design";
-  } else if (uploadType === "prints") {
-    uploadTitle.textContent = "Upload Print";
-  }
+  document.getElementById("uploadTitle").textContent = `Upload to ${label}`;
   document.getElementById("uploadModal").classList.remove("hidden");
 }
 
@@ -508,13 +605,11 @@ function handleFileSelect(event) {
 }
 
 function processFile(file) {
-  // Validate file type
   if (!file.type.startsWith("image/")) {
     showNotification("Please select an image file", "error");
     return;
   }
 
-  // Validate file size (max 5MB)
   if (file.size > 5 * 1024 * 1024) {
     showNotification("File size must be less than 5MB", "error");
     return;
@@ -525,10 +620,7 @@ function processFile(file) {
     document.getElementById("previewImage").src = e.target.result;
     document.getElementById("filePreview").style.display = "block";
     document.getElementById("uploadArea").style.display = "none";
-    document.getElementById("fileTitle").value = file.name.replace(
-      /\.[^/.]+$/,
-      "",
-    );
+    document.getElementById("fileTitle").value = file.name.replace(/\.[^/.]+$/, "");
   };
   reader.readAsDataURL(file);
 }
@@ -540,281 +632,45 @@ function removePreview() {
   document.getElementById("fileTitle").value = "";
 }
 
-function saveToStorage(key, data) {
-  try {
-    localStorage.setItem(key, JSON.stringify(data));
-  } catch (e) {
-    // localStorage might be full with base64 images
-    console.warn("Storage full, clearing old data");
-    showNotification(
-      "Storage limit reached. Some data may not persist.",
-      "warning",
-    );
+async function uploadFile() {
+  const fileInput = document.getElementById("fileInput");
+  const fileTitle = document.getElementById("fileTitle").value.trim();
+
+  const file = fileInput.files[0];
+  if (!file) return alert("Select a file first");
+
+  if (!fileTitle) {
+    showNotification("Please enter title", "error");
+    return;
   }
-}
 
-// ==================== CONTENT LOADING ====================
-function loadContent(type) {
-  if (type === "logos") loadLogos();
-  if (type === "banners") loadBanners();
-  if (type === "designs") loadDesigns();
-  if (type === "prints") loadPrints();
-}
-
-async function loadLogos() {
-  const gallery = document.getElementById("logosGallery");
-  const emptyState = document.getElementById("logosEmpty");
+  const formData = new FormData();
+  formData.append("file", file);
+  formData.append("title", fileTitle); // ✅ send title
 
   try {
-    const res = await fetch("/uploads/logos");
-    const logos = await res.json();
-    logosGalleryItems = logos.map((file) => ({
-      url: file,
-      name: file.split("/").pop(),
-    }));
+    const res = await fetch(`/upload?type=${currentUploadType}`, {
+      method: "POST",
+      body: formData,
+    });
 
-    if (!logos || logos.length === 0) {
-      gallery.innerHTML = "";
-      emptyState.style.display = "block";
-      return [];
+    const data = await res.json();
+
+    if (data.success) {
+      showNotification("File uploaded successfully", "success");
+      closeUploadModal();
+
+      await loadGalleryForType(currentUploadType);
+      renderGalleryForType(currentUploadType);
+    } else {
+      showNotification("Upload failed: " + data.message, "error");
     }
-
-    emptyState.style.display = "none";
-    gallery.innerHTML = logosGalleryItems
-      .map(
-        (item, index) => `
-      <div class="gallery-item">
-        <div class="item-image-wrapper">
-          <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
-
-          <div class="item-overlay">
-            <i class="fas fa-expand" onclick="openLightbox('logos', ${index})"></i>
-          </div>
-        ${
-          currentUser && currentUser.role === "admin"
-            ? `
-      <button class="delete-btn" onclick="deleteContent('${item.url}')">
-        <i class="fas fa-trash"></i>
-      </button>
-    `
-            : ""
-        }
-
-        </div>
-      </div>
-    `,
-      )
-      .join("");
-
-    return logosGalleryItems;
   } catch (err) {
     console.error(err);
-    gallery.innerHTML = "";
-    emptyState.style.display = "block";
-    return [];
+    showNotification("Upload error", "error");
   }
 }
 
-async function loadBanners() {
-  const gallery = document.getElementById("bannersGallery");
-  const emptyState = document.getElementById("bannersEmpty");
-
-  try {
-    const res = await fetch("/uploads/banners");
-    const banners = await res.json();
-
-    if (!banners || banners.length === 0) {
-      gallery.innerHTML = "";
-      emptyState.style.display = "block";
-      return [];
-    }
-
-    emptyState.style.display = "none";
-    bannersGalleryItems = banners.map((filename) => ({
-      url: `/uploads/banners/${filename}`,
-      name: filename,
-    }));
-
-    gallery.innerHTML = bannersGalleryItems
-      .map(
-        (item, index) => `
-      <div class="gallery-item">
-        <div class="item-image-wrapper">
-
-          <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
-
-          <div class="item-overlay" onclick="openLightbox('banners', ${index})">
-            <i class="fas fa-expand"></i>
-          </div>
-
-         ${
-           currentUser && currentUser.role === "admin"
-             ? `
-      <button class="delete-btn" onclick="deleteContent('${item.url}')">
-        <i class="fas fa-trash"></i>
-      </button>
-    `
-             : ""
-         }
-
-        </div>
-      </div>
-    `,
-      )
-      .join("");
-
-    return bannersGalleryItems;
-  } catch (err) {
-    console.error(err);
-    gallery.innerHTML = "";
-    emptyState.style.display = "block";
-    return [];
-  }
-}
-
-async function loadPrints() {
-  const gallery = document.getElementById("printsGallery");
-  const emptyState = document.getElementById("printsEmpty");
-
-  try {
-    const res = await fetch("/uploads/prints");
-    const prints = await res.json();
-
-    if (!prints || prints.length === 0) {
-      gallery.innerHTML = "";
-      emptyState.style.display = "block";
-      return [];
-    }
-
-    emptyState.style.display = "none";
-    printsGalleryItems = prints.map((filename) => ({
-      url: `/uploads/prints/${filename}`,
-      name: filename,
-    }));
-    gallery.innerHTML = printsGalleryItems
-      .map(
-        (item, index) => `
-      <div class="gallery-item">
-        <div class="item-image-wrapper">
-
-          <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
-
-          <div class="item-overlay" onclick="openLightbox('prints', ${index})">
-            <i class="fas fa-expand"></i>
-          </div>
-
-         ${
-           currentUser && currentUser.role === "admin"
-             ? `
-      <button class="delete-btn" onclick="deleteContent('${item.url}')">
-        <i class="fas fa-trash"></i>
-      </button>
-    `
-             : ""
-         }
-
-        </div>
-      </div>
-    `,
-      )
-      .join("");
-
-    return printsGalleryItems;
-  } catch (err) {
-    console.error(err);
-    gallery.innerHTML = "";
-    emptyState.style.display = "block";
-    return [];
-  }
-}
-
-async function loadDesigns() {
-  const gallery = document.getElementById("designsGallery");
-  const emptyState = document.getElementById("designsEmpty");
-
-  try {
-    const res = await fetch("/uploads/designs");
-    const designs = await res.json();
-
-    if (!designs || designs.length === 0) {
-      gallery.innerHTML = "";
-      emptyState.style.display = "block";
-      return [];
-    }
-
-    emptyState.style.display = "none";
-    designsGalleryItems = designs.map((filename) => ({
-      url: `/uploads/designs/${filename}`,
-      name: filename,
-    }));
-
-    gallery.innerHTML = designsGalleryItems
-      .map(
-        (item, index) => `
-      <div class="gallery-item">
-        <div class="item-image-wrapper">
-          
-          <img src="${item.url}" alt="${item.name}" class="item-image" loading="lazy">
-
-          <!-- Lightbox -->
-          <div class="item-overlay" onclick="openLightbox('designs', ${index})">
-            <i class="fas fa-expand"></i>
-          </div>
-
-      ${
-        currentUser && currentUser.role === "admin"
-          ? `
-      <button class="delete-btn" onclick="deleteContent('${item.url}')">
-        <i class="fas fa-trash"></i>
-      </button>
-    `
-          : ""
-      }
-
-        </div>
-      </div>
-    `,
-      )
-      .join("");
-
-    return designsGalleryItems;
-  } catch (err) {
-    console.error(err);
-    gallery.innerHTML = "";
-    emptyState.style.display = "block";
-    return [];
-  }
-}
-
-async function loadAdminContent() {
-  if (!currentUser || currentUser.role !== "admin") return;
-
-  const logos = await loadLogos();
-  const banners = await loadBanners();
-  const prints = await loadPrints();
-  const designs = await loadDesigns();
-  document.getElementById("adminLogoCount").textContent = logos.length;
-  document.getElementById("adminBannerCount").textContent = banners.length;
-  document.getElementById("adminPrintCount").textContent = prints.length;
-  document.getElementById("adminDesignCount").textContent = designs.length;
-  document.getElementById("adminUserCount").textContent =
-    registeredUsers.length + 1; // +1 for admin
-}
-
-function updateStats() {
-  loadLogos().then((logos) => {
-    document.getElementById("totalLogos").textContent = logos.length;
-  });
-  loadBanners().then((banners) => {
-    document.getElementById("totalBanners").textContent = banners.length;
-  });
-  loadDesigns().then((designs) => {
-    document.getElementById("totalDesigns").textContent = designs.length;
-  });
-  loadPrints().then((prints) => {
-    document.getElementById("totalPrints").textContent = prints.length;
-  });
-}
 async function deleteContent(fileUrl) {
   if (!confirm("Are you sure you want to delete this file?")) return;
 
@@ -825,8 +681,6 @@ async function deleteContent(fileUrl) {
     const filename = segments.pop();
     const type = segments.pop();
 
-    console.log("DELETE:", `/uploads/${type}/${filename}`);
-
     const res = await fetch(`/uploads/${type}/${filename}`, {
       method: "DELETE",
     });
@@ -834,14 +688,11 @@ async function deleteContent(fileUrl) {
     const data = await res.json();
 
     if (data.success) {
-      alert("Deleted successfully");
-
-      if (type === "logos") await loadLogos();
-      if (type === "designs") await loadDesigns();
-      if (type === "prints") await loadPrints();
-      if (type === "banners") await loadBanners();
+      showNotification("File deleted successfully", "success");
+      await loadGalleryForType(type);
+      renderGalleryForType(type);
     } else {
-      alert(data.message || "Delete failed");
+      showNotification(data.message || "Delete failed", "error");
     }
   } catch (err) {
     console.error("Delete error:", err);
@@ -850,13 +701,11 @@ async function deleteContent(fileUrl) {
 
 // ==================== NAVIGATION ====================
 function navigateTo(page) {
-  // Close mobile menu
   const navMenu = document.getElementById("navMenu");
   const hamburger = document.getElementById("hamburger");
   navMenu.classList.remove("active");
   hamburger.classList.remove("active");
 
-  // Close dropdown
   closeUserDropdown();
 
   // Admin page protection
@@ -866,7 +715,7 @@ function navigateTo(page) {
   }
 
   // Profile/Settings page protection
-  if ((page === "profile" || page === "settings") && !currentUser) {
+  if (page === "profile" && !currentUser) {
     openAuthModal();
     pendingNavigation = page;
     return;
@@ -892,15 +741,18 @@ function navigateTo(page) {
     navLink.classList.add("active");
   }
 
-  // Load content for the page
-  if (page === "logos") loadLogos();
-  if (page === "banners") loadBanners();
-  if (page === "designs") loadDesigns();
-  if (page === "prints") loadPrints();
-  if (page === "admin") loadAdminContent();
-  if (page === "profile") updateProfilePage();
+  // Load/render content
+  if (navigationItems.find(n => n.folder === page)) {
+    renderGalleryForType(page);
+  }
 
-  // Scroll to top
+  if (page === "admin") {
+    loadAdminContent();
+  }
+  if (page === "profile") {
+    updateProfilePage();
+  }
+
   window.scrollTo({ top: 0, behavior: "smooth" });
 
   currentPage = page;
@@ -914,93 +766,126 @@ function toggleMobileMenu() {
 }
 
 function filterGallery(filter, btn) {
-  // Update active filter button
-  btn
-    .closest(".gallery-filter")
+  btn.closest(".gallery-filter")
     .querySelectorAll(".filter-btn")
     .forEach((b) => b.classList.remove("active"));
   btn.classList.add("active");
 
-  // For now, just reload (could implement actual filtering)
-  if (currentPage === "logos") loadLogos();
-  if (currentPage === "banners") loadBanners();
-  if (currentPage === "designs") loadDesigns();
-  if (currentPage === "prints") loadPrints();
+  if (navigationItems.find(n => n.folder === currentPage)) {
+    renderGalleryForType(currentPage);
+  }
 }
 
-// ==================== LIGHTBOX ====================
+// ==================== LIGHTBOX WITH ZOOM ====================
 function openLightbox(type, index) {
   lightboxCurrentType = type;
   lightboxCurrentIndex = index;
+  lightboxZoom = 1;
 
-  let items;
-  switch (type) {
-    case "logos":
-      items = logosGalleryItems;
-      break;
-    case "banners":
-      items = bannersGalleryItems;
-      break;
-    case "designs":
-      items = designsGalleryItems;
-      break;
-    case "prints":
-      items = printsGalleryItems;
-      break;
-    default:
-      items = [];
-  }
-
-  lightboxItems = items;
+  const items = galleryDataByType[type] || [];
   const item = items[index];
 
   if (!item) return;
 
-  document.getElementById("lightboxImage").src = item.url;
-  document.getElementById("lightboxTitle").textContent = item.name;
-  document.getElementById("lightboxDate").textContent =
-    new Date().toLocaleDateString();
+  const img = document.getElementById("lightboxImage");
+  img.src = item.url;
+  img.style.transform = `scale(1)`;
+
+  document.getElementById("zoomLevel").textContent = "100%";
   document.getElementById("lightbox").classList.remove("hidden");
   document.body.style.overflow = "hidden";
+
+  setupLightboxZoom();
 }
 
 function closeLightbox() {
   document.getElementById("lightbox").classList.add("hidden");
   document.body.style.overflow = "";
+  lightboxZoom = 1;
 }
 
 function navigateLightbox(direction) {
-  if (!lightboxItems || lightboxItems.length === 0) return;
+  const items = galleryDataByType[lightboxCurrentType] || [];
+  if (!items || items.length === 0) return;
 
   lightboxCurrentIndex += direction;
 
-  if (lightboxCurrentIndex < 0) lightboxCurrentIndex = lightboxItems.length - 1;
-  if (lightboxCurrentIndex >= lightboxItems.length) lightboxCurrentIndex = 0;
+  if (lightboxCurrentIndex < 0) lightboxCurrentIndex = items.length - 1;
+  if (lightboxCurrentIndex >= items.length) lightboxCurrentIndex = 0;
 
-  const item = lightboxItems[lightboxCurrentIndex];
-  document.getElementById("lightboxImage").src = item.url;
-  document.getElementById("lightboxTitle").textContent = item.name;
-  document.getElementById("lightboxDate").textContent =
-    new Date().toLocaleDateString();
+  const item = items[lightboxCurrentIndex];
+  const img = document.getElementById("lightboxImage");
+
+  lightboxZoom = 1;
+  img.src = item.url;
+  img.style.transform = `scale(1)`;
+
+  document.getElementById("zoomLevel").textContent = "100%";
 }
 
-// ==================== CONTACT FORM ====================
-function handleContactSubmit(event) {
-  event.preventDefault();
+function zoomLightboxImage(zoomChange) {
+  const img = document.getElementById("lightboxImage");
+  const newZoom = lightboxZoom + zoomChange;
 
-  const name = document.getElementById("contactName").value;
-  const email = document.getElementById("contactEmail").value;
-  const subject = document.getElementById("contactSubject").value;
-  const message = document.getElementById("contactMessage").value;
-
-  // Simulate form submission
-  showNotification(`Thank you ${name}! Your message has been sent.`, "success");
-
-  // Reset form
-  event.target.reset();
+  if (newZoom >= 0.5 && newZoom <= 4) {
+    lightboxZoom = newZoom;
+    img.style.transform = `scale(${lightboxZoom})`;
+    document.getElementById("zoomLevel").textContent = Math.round(lightboxZoom * 100) + "%";
+  }
 }
 
+function setupLightboxZoom() {
+  const lightboxContent = document.getElementById("lightboxContent");
 
+  lightboxContent.onwheel = null;
+
+  lightboxContent.addEventListener("wheel", (e) => {
+    if (e.ctrlKey) {
+      e.preventDefault();
+      const zoomChange = e.deltaY > 0 ? -0.1 : 0.1;
+      zoomLightboxImage(zoomChange);
+    }
+  }, { passive: false });
+
+  let lastDistance = 0;
+  lightboxContent.addEventListener("touchmove", (e) => {
+    if (e.touches.length === 2) {
+      e.preventDefault();
+      const touch1 = e.touches[0];
+      const touch2 = e.touches[1];
+
+      const dx = touch1.clientX - touch2.clientX;
+      const dy = touch1.clientY - touch2.clientY;
+      const distance = Math.sqrt(dx * dx + dy * dy);
+
+      if (lastDistance > 0) {
+        const delta = distance - lastDistance;
+        const zoomChange = delta > 0 ? 0.05 : -0.05;
+        zoomLightboxImage(zoomChange);
+      }
+
+      lastDistance = distance;
+    }
+  }, { passive: false });
+
+  lightboxContent.addEventListener("touchend", () => {
+    lastDistance = 0;
+  });
+}
+
+async function loadAdminContent() {
+  if (!currentUser || currentUser.role !== "admin") return;
+
+  let totalFiles = 0;
+  for (let item of navigationItems) {
+    const files = galleryDataByType[item.folder] || [];
+    totalFiles += files.length;
+  }
+
+  document.getElementById("adminNavCount").textContent = navigationItems.length;
+  document.getElementById("adminTotalFiles").textContent = totalFiles;
+  document.getElementById("adminUserCount").textContent = "1";
+}
 
 // ==================== NOTIFICATIONS ====================
 function showNotification(message, type = "info") {
@@ -1017,13 +902,12 @@ function showNotification(message, type = "info") {
   };
 
   notification.innerHTML = `
-        <i class="fas fa-${iconMap[type] || "info-circle"}"></i>
-        <span>${message}</span>
-    `;
+    <i class="fas fa-${iconMap[type] || "info-circle"}"></i>
+    <span>${message}</span>
+  `;
 
   container.appendChild(notification);
 
-  // Auto remove after 4 seconds
   setTimeout(() => {
     notification.classList.add("removing");
     setTimeout(() => notification.remove(), 300);
@@ -1032,88 +916,48 @@ function showNotification(message, type = "info") {
 
 // ==================== EVENT LISTENERS ====================
 function setupEventListeners() {
-  // Close modals on backdrop click (but NOT auth modal when user not logged in)
   document.querySelectorAll(".modal-backdrop").forEach((backdrop) => {
     backdrop.addEventListener("click", (e) => {
-      // Check if this is the auth modal and user is not logged in
       const authModal = document.getElementById("authModal");
       if (e.target.closest("#authModal") && !currentUser) {
-        // Don't close auth modal if user is not logged in
         return;
       }
       closeAuthModal();
       closeUploadModal();
+      closeNavManagement();
     });
   });
 
-  // Close dropdown on outside click
   document.addEventListener("click", (e) => {
     if (!e.target.closest(".user-dropdown")) {
       closeUserDropdown();
     }
   });
 
-  // Password strength indicator
-  const regPassword = document.getElementById("regPassword");
-  if (regPassword) {
-    regPassword.addEventListener("input", (e) => {
-      const strength = calculatePasswordStrength(e.target.value);
-      const bar = document.querySelector(".strength-bar");
-      if (bar) {
-        bar.style.width = strength.percent + "%";
-        bar.style.background = strength.color;
-      }
-    });
-  }
-
-  // Keyboard navigation for lightbox
   document.addEventListener("keydown", (e) => {
     const lightbox = document.getElementById("lightbox");
     if (!lightbox.classList.contains("hidden")) {
       if (e.key === "ArrowLeft") navigateLightbox(-1);
       if (e.key === "ArrowRight") navigateLightbox(1);
+
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === "+" || e.key === "=") {
+          e.preventDefault();
+          zoomLightboxImage(0.1);
+        }
+        if (e.key === "-") {
+          e.preventDefault();
+          zoomLightboxImage(-0.1);
+        }
+        if (e.key === "0") {
+          e.preventDefault();
+          lightboxZoom = 1;
+          document.getElementById("lightboxImage").style.transform = `scale(1)`;
+          document.getElementById("zoomLevel").textContent = "100%";
+        }
+      }
     }
   });
-}
-
-// ==================== UTILITIES ====================
-function formatDate(dateStr) {
-  const date = new Date(dateStr);
-  return date.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  });
-}
-
-function calculatePasswordStrength(password) {
-  let score = 0;
-
-  if (password.length >= 6) score += 20;
-  if (password.length >= 10) score += 20;
-  if (/[A-Z]/.test(password)) score += 20;
-  if (/[0-9]/.test(password)) score += 20;
-  if (/[^A-Za-z0-9]/.test(password)) score += 20;
-
-  let color = "#ef4444"; // red
-  if (score >= 60) color = "#f59e0b"; // yellow
-  if (score >= 80) color = "#10b981"; // green
-
-  return { percent: score, color };
-}
-
-function getTimeAgo(date) {
-  const now = new Date();
-  const diffMs = now - new Date(date);
-  const diffMins = Math.floor(diffMs / 60000);
-  const diffHours = Math.floor(diffMs / 3600000);
-  const diffDays = Math.floor(diffMs / 86400000);
-
-  if (diffMins < 1) return "just now";
-  if (diffMins < 60) return `${diffMins}m ago`;
-  if (diffHours < 24) return `${diffHours}h ago`;
-  if (diffDays < 7) return `${diffDays}d ago`;
-  return formatDate(date);
 }
 
 async function changePassword() {
@@ -1130,19 +974,11 @@ async function changePassword() {
   }
 }
 
-// ==================== PRINT & DOWNLOAD ====================
-function printDesign(designUrl) {
-  const printWindow = window.open(designUrl, "_blank");
-  printWindow.addEventListener("load", () => {
-    printWindow.print();
+function formatDate(dateStr) {
+  const date = new Date(dateStr);
+  return date.toLocaleDateString("en-US", {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
   });
-}
-
-function downloadDesign(designUrl, fileName) {
-  const link = document.createElement("a");
-  link.href = designUrl;
-  link.download = fileName || "design";
-  document.body.appendChild(link);
-  link.click();
-  document.body.removeChild(link);
 }

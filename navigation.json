@@ -1,0 +1,33 @@
+[
+  {
+    "id": 1,
+    "label": "Logos",
+    "icon": "fa-paint-brush",
+    "folder": "logos"
+  },
+  {
+    "id": 2,
+    "label": "Banners",
+    "icon": "fa-image",
+    "folder": "banners"
+  },
+  {
+    "id": 3,
+    "label": "Designs",
+    "icon": "fa-palette",
+    "folder": "designs"
+  },
+  {
+    "id": 4,
+    "label": "Prints",
+    "icon": "fa-print",
+    "folder": "prints"
+  },
+  {
+    "id": 5,
+    "label": "Icon Design",
+    "icon": "fa-icons",
+    "folder": "icon-design",
+    "createdAt": "2026-04-07T06:53:21.987Z"
+  }
+]

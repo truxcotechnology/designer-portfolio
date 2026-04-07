@@ -3,7 +3,6 @@ const path = require('path');
 const multer = require('multer');
 const fs = require('fs');
 const app = express();
-// const PORT = 5000;
 
 // ==================== MIDDLEWARE ====================
 // 1️⃣ Storage must be declared first
@@ -33,6 +32,152 @@ app.use("/uploads", express.static(path.join(__dirname, "public", "uploads")));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
+const upload = multer({ storage });
+
+// ==================== NAVIGATION MANAGEMENT ====================
+const navigationFile = path.join(__dirname, "navigation.json");
+
+// Initialize navigation file if it doesn't exist
+function initializeNavigation() {
+  if (!fs.existsSync(navigationFile)) {
+    const defaultNav = [
+      { id: 1, label: "Logos", icon: "fa-paint-brush", folder: "logos" },
+      { id: 2, label: "Banners", icon: "fa-image", folder: "banners" },
+      { id: 3, label: "Designs", icon: "fa-palette", folder: "designs" },
+      { id: 4, label: "Prints", icon: "fa-print", folder: "prints" },
+    ];
+    fs.writeFileSync(navigationFile, JSON.stringify(defaultNav, null, 2));
+    return defaultNav;
+  }
+  return JSON.parse(fs.readFileSync(navigationFile, 'utf-8'));
+}
+
+// Get all navigation items
+app.get("/api/navigation", (req, res) => {
+  try {
+    const navItems = initializeNavigation();
+    res.json(navItems);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to load navigation" });
+  }
+});
+
+// Add new navigation item
+app.post("/api/navigation/add", (req, res) => {
+  try {
+    const { label, icon } = req.body;
+
+    if (!label || !icon) {
+      return res.status(400).json({ success: false, message: "Label and icon required" });
+    }
+
+    // Create folder name from label (lowercase, no spaces)
+    const folderName = label.toLowerCase().replace(/\s+/g, '-');
+    const folderPath = path.join(__dirname, "public", "uploads", folderName);
+
+    // Create the folder if it doesn't exist
+    if (!fs.existsSync(folderPath)) {
+      fs.mkdirSync(folderPath, { recursive: true });
+    }
+
+    // Get current navigation
+    let navItems = initializeNavigation();
+    
+    // Generate new ID
+    const newId = navItems.length > 0 ? Math.max(...navItems.map(n => n.id)) + 1 : 1;
+
+    // Add new item
+    const newItem = {
+      id: newId,
+      label: label,
+      icon: icon,
+      folder: folderName,
+      createdAt: new Date().toISOString()
+    };
+
+    navItems.push(newItem);
+
+    // Save to file
+    fs.writeFileSync(navigationFile, JSON.stringify(navItems, null, 2));
+
+    res.json({
+      success: true,
+      message: `Navigation item "${label}" added successfully`,
+      data: newItem
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to add navigation item" });
+  }
+});
+
+// Delete navigation item
+app.delete("/api/navigation/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const deleteFolder = req.query.deleteFolder === 'true';
+
+    let navItems = initializeNavigation();
+    const itemIndex = navItems.findIndex(n => n.id === parseInt(id));
+
+    if (itemIndex === -1) {
+      return res.status(404).json({ success: false, message: "Navigation item not found" });
+    }
+
+    const item = navItems[itemIndex];
+    const folderPath = path.join(__dirname, "public", "uploads", item.folder);
+
+    // Delete folder if requested
+    if (deleteFolder && fs.existsSync(folderPath)) {
+      fs.rmSync(folderPath, { recursive: true, force: true });
+    }
+
+    // Remove from navigation
+    navItems.splice(itemIndex, 1);
+    fs.writeFileSync(navigationFile, JSON.stringify(navItems, null, 2));
+
+    res.json({
+      success: true,
+      message: `Navigation item removed successfully`
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to delete navigation item" });
+  }
+});
+
+// Update navigation item
+app.put("/api/navigation/:id", (req, res) => {
+  try {
+    const { id } = req.params;
+    const { label, icon } = req.body;
+
+    let navItems = initializeNavigation();
+    const item = navItems.find(n => n.id === parseInt(id));
+
+    if (!item) {
+      return res.status(404).json({ success: false, message: "Navigation item not found" });
+    }
+
+    if (label) item.label = label;
+    if (icon) item.icon = icon;
+    item.updatedAt = new Date().toISOString();
+
+    fs.writeFileSync(navigationFile, JSON.stringify(navItems, null, 2));
+
+    res.json({
+      success: true,
+      message: "Navigation item updated",
+      data: item
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false, message: "Failed to update navigation item" });
+  }
+});
+
+// ==================== FILE MANAGEMENT ====================
 app.get("/uploads/list", (req, res) => {
   const uploadsDir = path.join(__dirname,'public', '/uploads');
 
@@ -53,6 +198,25 @@ app.get("/uploads/list", (req, res) => {
 
     res.json(result);
   });
+});
+
+// Get files by type
+app.get('/uploads/:type', (req, res) => {
+  try {
+    const type = req.params.type;
+    if (!type) return res.status(400).json({ error: 'Missing type' });
+
+    const folder = path.join(__dirname, 'public', 'uploads', type);
+
+    if (!fs.existsSync(folder)) return res.json([]);
+
+    const files = fs.readdirSync(folder);
+    const urls = files.map(file => `/uploads/${type}/${file}`);
+    res.json(urls);
+  } catch (err) {
+    console.error('Error reading uploads folder:', err);
+    res.status(500).json({ error: 'Failed to load uploads' });
+  }
 });
 
 // Delete file API
@@ -82,33 +246,7 @@ app.delete('/uploads/:type/:filename', (req, res) => {
   }
 });
 
-// Return list of banners
-app.get('/uploads/banners', (req, res) => {
-    const bannersDir = path.join(__dirname, 'public', 'uploads/banners');
-    fs.readdir(bannersDir, (err, files) => {
-        if (err) return res.status(500).json([]);
-        res.json(files);
-    });
-});
-
-// Return list of designs
-app.get('/uploads/designs', (req, res) => {
-    const designsDir = path.join(__dirname, 'public', 'uploads/designs');
-    fs.readdir(designsDir, (err, files) => {
-        if (err) return res.status(500).json([]);
-        res.json(files);
-    });
-});
-
-app.get('/uploads/prints', (req, res) => {
-    const printsDir = path.join(__dirname, 'public', 'uploads/prints');
-    fs.readdir(printsDir, (err, files) => {
-        if (err) return res.status(500).json([]);
-        res.json(files);
-    });
-});
-const upload = multer({ storage });
-
+// Upload file
 app.post("/upload", upload.single("file"), (req, res) => {
   try {
     const file = req.file;
@@ -122,25 +260,6 @@ app.post("/upload", upload.single("file"), (req, res) => {
     });
   } catch (err) {
     res.status(500).json({ success: false });
-  }
-});
-
-// Get list of files
-app.get('/uploads/:type', (req, res) => {
-  try {
-    const type = req.params.type; // logos, banners, or designs
-    if (!type) return res.status(400).json({ error: 'Missing type' });
-
-    const folder = path.join(__dirname, 'public', 'uploads', type);
-
-    if (!fs.existsSync(folder)) return res.json([]);
-
-    const files = fs.readdirSync(folder);
-    const urls = files.map(file => `/uploads/${type}/${file}`);
-    res.json(urls);
-  } catch (err) {
-    console.error('Error reading uploads folder:', err);
-    res.status(500).json({ error: 'Failed to load uploads' });
   }
 });
 
@@ -290,11 +409,10 @@ app.post("/signup", async (req, res) => {
 });
 
 // Start server
-// app.listen(PORT, () => {
-//   console.log(`Server running on http://localhost:${PORT}`);
-// });
 const PORT = process.env.PORT || 5000;
 
 app.listen(PORT, () => {
+  // Initialize navigation on startup
+  initializeNavigation();
   console.log(`Server running on port ${PORT}`);
 });
