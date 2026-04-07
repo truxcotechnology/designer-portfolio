@@ -171,10 +171,18 @@ async function loadGalleryForType(type) {
   try {
     const res = await fetch(`/uploads/${type}`);
     const files = await res.json();
+
     galleryDataByType[type] = files.map(url => ({
       url: url,
       name: url.split("/").pop(),
     }));
+
+    // ✅ PRELOAD IMAGES
+    galleryDataByType[type].forEach(item => {
+      const img = new Image();
+      img.src = item.url;
+    });
+
     return galleryDataByType[type];
   } catch (err) {
     console.error(`Failed to load ${type}:`, err);
@@ -479,18 +487,22 @@ async function handleLogin(event) {
     showNotification("Server error. Try again.", "error");
   }
 }
-
 function completeLogin() {
   localStorage.setItem("currentUser", JSON.stringify(currentUser));
   updateUIForLoggedInUser();
   closeAuthModal();
   showNotification(`Welcome back, ${currentUser.username}!`, "success");
 
+  // ✅ 🔥 PRE-RENDER ALL GALLERIES (IMPORTANT)
+  navigationItems.forEach(item => {
+    renderGalleryForType(item.folder);
+  });
+
+  // Navigate
   if (pendingNavigation) {
     navigateTo(pendingNavigation);
     pendingNavigation = null;
   } else {
-    // Navigate to first gallery item
     if (navigationItems.length > 0) {
       navigateTo(navigationItems[0].folder);
     }
@@ -500,6 +512,7 @@ function completeLogin() {
     loadAdminContent();
   }
 }
+
 
 async function handleLogout() {
   currentUser = null;
